@@ -1,0 +1,211 @@
+---
+title: "Ramen Ratings"
+author: "Darya Akimova"
+date: "6/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Packages:
+
+```{r packages}
+library(tidyverse)
+library(ggthemes)
+library(tidytext)
+theme_set(theme_minimal())
+```
+
+
+Data:
+
+```{r data}
+raw <- read_csv("../data/2019/2019-06-04/ramen_ratings.csv")
+# structure / variables:
+glimpse(raw)
+# any missing values?
+sapply(raw, anyNA)
+# how many missing values per column?
+sapply(data.frame(sapply(raw, is.na)), sum)
+```
+
+
+Cleaning:
+
+```{r cleaning}
+which(is.na(raw$review_number))
+raw %>% 
+  slice(188:192)
+sum(raw$review_number == 2991, na.rm = TRUE)
+# for reveiw_number, replace NA with 2991
+raw %>% 
+  filter(is.na(style))
+table(raw$style)
+# googled, both are Pack style
+raw %>% 
+  filter(is.na(stars))
+# reviews 1587, 2458, 2548, 3149, and 3150 are for plain noodles - no rating given
+# 2641 is a plastic toy
+# the Nona Lim products are 2 separate products that the rater combined into one dish and gave 2 separate ratings to
+# better remove all of the products with no stars as they are different from the others
+updt <- raw %>% 
+  mutate(
+    review_number = replace_na(review_number, 2991),
+    style = replace_na(style, "Pack")
+    ) %>%
+  filter(!is.na(stars))
+sapply(updt, anyNA)
+# all NA are gone
+# how many brands are there?
+length(unique(updt$brand))
+updt %>% 
+  count(brand) %>% 
+  ggplot(aes(n)) +
+  geom_histogram(bins = 50) +
+  xlab("Number of Ramen by Brand")
+updt %>% 
+  count(brand, sort = TRUE)
+# Nissin by far the most common one reviewed
+sort(unique(updt$country))
+# 2 corrections to make: United States/USA and Philippines typo
+updt <- updt %>% 
+  mutate(country = case_when(country == "Phlippines" ~ "Philippines", country == "USA" ~ "United States", TRUE ~ country))
+updt %>% 
+  count(country, sort = T)
+updt %>% 
+  count(country) %>%
+  select(n) %>% 
+  summary()
+updt <- updt %>% 
+  unnest_tokens(words, variety, drop = FALSE) 
+top_words <- updt %>% 
+  count(words, sort = TRUE) %>% 
+  top_n(50)
+top_words
+updt %>% 
+  filter(words %in% top_words$words) %>% 
+  group_by(words) %>% 
+  summarize(
+    avg_star = mean(stars),
+    num = n()
+    ) %>% 
+  ggplot(aes(num, avg_star)) +
+  geom_point() +
+  xlab("Word Count in Variety Name") +
+  ylab("Average Rating")
+updt %>% 
+  select(-words) %>% 
+  distinct() %>% 
+  summarize(avg_rate = mean(stars))
+best_worst <- updt %>% 
+  filter(words %in% top_words$words) %>% 
+  group_by(words) %>% 
+  summarize(
+    avg_star = mean(stars),
+    num = n()
+    ) %>% 
+  arrange(avg_star) %>% 
+  slice(c(1:10, 41:50)) %>% 
+  mutate(
+    star_diff = avg_star - 3.69,
+    group = ifelse(avg_star > 3.5, "best", "worst"),
+    plot_order = factor(words, levels = words)
+    ) 
+best_worst %>% 
+  ggplot(aes(plot_order, star_diff, fill = group)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_tableau()
+
+updt %>% 
+  inner_join(best_worst, by = "words") %>% 
+  ggplot(aes(plot_order, stars, color = group)) +
+  geom_jitter(width = 0.1, alpha = 0.3) +
+  scale_color_tableau() +
+  coord_flip()
+library(ggridges)
+updt %>% 
+  inner_join(best_worst, by = "words") %>% 
+  ggplot(aes(x = stars, y = plot_order, fill = group)) +
+  geom_density_ridges(scale = 5) +
+  scale_fill_tableau() +
+  geom_vline(xintercept = 3.69, color = "white", alpha = 0.75, width = 2)
+updt %>% 
+  inner_join(best_worst, by = "words") %>% 
+  mutate(all_star_diff = stars - 3.69) %>% 
+  ggplot(aes(x = all_star_diff, y = plot_order, fill = group)) +
+  geom_density_ridges(scale = 5) +
+  scale_fill_tableau()
+updt %>% 
+  inner_join(best_worst, by = "words") %>% 
+  ggplot(aes(plot_order, stars, fill = group)) +
+  geom_boxplot() +
+  scale_fill_tableau() +
+  coord_flip()
+updt %>% 
+  inner_join(best_worst, by = "words") %>% 
+  count(words, country, group) %>% 
+  arrange(words) %>% 
+  count(words, group, sort = TRUE)
+updt %>% select(-words) %>% distinct() %>% count(brand, variety, style, sort = TRUE) %>% filter(n > 1)
+```
+
+
+For sharing:
+
+```{r cleaned_version, comment=NA}
+ramen_ratings <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-06-04/ramen_ratings.csv")
+# some cleaning
+ramen_ratings <- ramen_ratings %>% 
+  mutate(
+    # missing review number
+    review_number = replace_na(review_number, 2991),
+    # looked up variety and brand
+    style = replace_na(style, "Pack"),
+    # typo fixes
+    country = case_when(country == "Phlippines" ~ "Philippines", country == "USA" ~ "United States", TRUE ~ country)
+    ) %>%
+  # missing stars are either noodles-only (no flavor), 2 products mixed together, or not food
+  filter(!is.na(stars))
+ramen_ratings <- ramen_ratings %>% 
+  mutate(star_diff = stars - mean(ramen_ratings$stars))
+ramen_tokens <- ramen_ratings %>% 
+  unnest_tokens(words, variety) %>% 
+  # remove duplicate words in variety name
+  distinct() %>% 
+  group_by(words) %>% 
+  summarize(
+    avg_stars = mean(stars),
+    n_words = n(),
+    avg_diff = mean(star_diff),
+    Rating = case_when(avg_diff < 0 ~ "Worse than average", avg_diff > 0 ~ "Better than average", TRUE ~ "Don't know")
+  )
+# plot of average star rating for ramen varieties associated with a word vs word count in all variety names (sanity check):
+ramen_tokens %>% 
+  # filter out some noise from rare words
+  filter(n_words > 10) %>% 
+  ggplot(aes(n_words, avg_stars, color = Rating)) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_color_tableau() +
+  ylab("Average star rating") +
+  xlab("Number of times word appears in variety name")
+# conclusion: plot not shown, but there's no obvius relationship between avg rating and word count
+ramen_tokens %>% 
+  # most common words, with count above 50 in dataset:
+  filter(n_words >= 50) %>% 
+  arrange(avg_diff) %>% 
+  # 10 best and worst avg rated words
+  slice(c(1:10, 37:46)) %>% 
+  ggplot(aes(factor(words, levels = words), avg_diff, fill = Rating)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_tableau() +
+  ylab("Average rating difference from mean rating") +
+  xlab("Word in variety name") +
+  ggtitle("Variety name words associated with better or worse ramen ratings")
+
+```
+
