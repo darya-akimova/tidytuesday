@@ -206,6 +206,31 @@ ramen_tokens %>%
   ylab("Average rating difference from mean rating") +
   xlab("Word in variety name") +
   ggtitle("Variety name words associated with better or worse ramen ratings")
-
+words_brand <- ramen_tokens %>% 
+  # most common words, with count above 50 in dataset:
+  filter(n_words >= 50) %>% 
+  arrange(avg_diff) %>% 
+  # 10 best and worst avg rated words
+  slice(c(1:10, 37:46)) %>% 
+  inner_join(
+    ramen_ratings %>% 
+      unnest_tokens(words, variety) %>% 
+      distinct(),
+    by = "words"
+  ) %>% 
+  select(words, brand, style, country) %>% 
+  distinct()
+words_brand %>% 
+  select(words, brand) %>% 
+  distinct() %>% 
+  # number of brands using word:
+  count(words, sort=TRUE) %>% 
+  inner_join(ramen_tokens, by = "words") %>% 
+  ggplot(aes(factor(words, levels = words), n, fill = Rating)) +
+  geom_col() +
+  scale_fill_tableau() +
+  coord_flip() +
+  xlab("Word in variety name") +
+  ylab("Brand count")
 ```
 
