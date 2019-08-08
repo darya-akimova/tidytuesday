@@ -1,0 +1,69 @@
+---
+title: "bird_counts"
+author: "Darya Akimova"
+date: "6/20/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+theme_set(theme_minimal())
+bird_counts <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-06-18/bird_counts.csv")
+head(bird_counts)
+dim(bird_counts)
+sapply(bird_counts, anyNA)
+bird_counts %>% 
+  filter(is.na(total_hours) | is.na(how_many_counted_by_hour)) %>% 
+  count(year)
+bird_counts %>%
+  count(year, name = "rows_per_year") %>% 
+  count(rows_per_year)
+bird_counts %>% 
+  count(species, name = "species_count") %>% 
+  count(species_count)
+bird_counts %>% 
+  ggplot(aes(year, total_hours)) +
+  geom_point()
+bird_counts %>% 
+  select(year, total_hours) %>% 
+  distinct() %>% 
+  count(year) %>% 
+  filter(n != 1)
+# total hours same for all bird species for each year
+bird_counts %>% 
+  ggplot(aes(year, how_many_counted_by_hour, group = species)) +
+  geom_line(alpha = 0.25)
+bird_genus <- bird_counts %>% 
+  separate(species_latin, into = c("genus", "species_in_genus"), remove = FALSE) 
+bird_genus %>% 
+  select(genus, species_in_genus) %>% 
+  distinct() %>% 
+  count(genus, name = "genus_num", sort = TRUE) %>% 
+  count(genus_num)
+common_genus <- bird_genus %>% 
+  select(genus, species_in_genus) %>% 
+  distinct() %>% 
+  count(genus, name = "genus_num", sort = TRUE) %>% 
+  filter(genus_num > 3)
+bird_genus %>% 
+  filter(genus %in% common_genus$genus) %>% 
+  ggplot(aes(year, how_many_counted_by_hour, group = species, color = genus)) +
+  geom_line()
+bird_counts_summ <- bird_counts %>% 
+  group_by(year) %>% 
+  summarize(
+    total_count = sum(how_many_counted),
+    total_per_hour = sum(how_many_counted_by_hour, na.rm = TRUE)
+  )
+bird_counts_summ %>% 
+  ggplot(aes(year, total_count)) +
+  geom_col()
+bird_counts_summ %>% 
+  ggplot(aes(year, total_per_hour)) +
+  geom_col()
+```
+
