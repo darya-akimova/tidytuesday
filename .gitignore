@@ -36,3 +36,4 @@ vignettes/*.pdf
 *.knit.md
 .Rproj.user
 tidytuesday_github.Rproj
+analysis/philly_tickets_full/parking_violations.csv
