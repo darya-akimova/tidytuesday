@@ -1,0 +1,19 @@
+---
+title: "Philly Parking Tickets"
+author: "Darya Akimova"
+date: "12/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+library(tidyverse)
+```
+
+
+```{r data}
+raw_data <- read_csv("./philly_tickets_full/parking_violations.csv")
+```
+
